@@ -1,0 +1,49 @@
+# templates/build-stage.yml
+parameters:
+- name: projectFile
+  type: string
+- name: buildConfiguration
+  type: string
+  default: Release
+- name: artifactName
+  type: string
+  default: drop
+
+jobs:
+- job: buildJob
+  displayName: Build and Package
+  pool:
+    vmImage: windows-latest
+  steps:
+  - checkout: self
+    displayName: Checkout source code
+
+  - task: UseDotNet@2
+    displayName: Use .NET Core sdk 9.0.x
+    inputs:
+      version: 9.0.x
+
+  - task: NuGetAuthenticate@1
+    displayName: NuGet Authenticate
+
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      projects: ${{ parameters.projectFile }}
+      arguments: -c ${{ parameters.buildConfiguration }} --output publish_output
+
+  - task: ArchiveFiles@2
+    displayName: Archive publish_output folder
+    inputs:
+      rootFolderOrFile: 'publish_output/'
+      includeRootFolder: false
+      archiveType: zip
+      archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Artifact
+    inputs:
+      PathtoPublish: $(Build.ArtifactStagingDirectory)
+      ArtifactName: ${{ parameters.artifactName }}
+    condition: succeededOrFailed()

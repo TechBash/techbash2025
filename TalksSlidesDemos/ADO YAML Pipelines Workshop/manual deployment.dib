@@ -1,0 +1,75 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"pwsh","items":[{"name":"csharp","languageName":"C#","aliases":["c#","cs"]},{"name":"fsharp","languageName":"F#","aliases":["f#","fs"]},{"name":"html","languageName":"HTML"},{"name":"http","languageName":"HTTP"},{"name":"javascript","languageName":"JavaScript","aliases":["js"]},{"name":"mermaid","languageName":"Mermaid"},{"name":"pwsh","languageName":"pwsh"},{"name":"value"}]}}
+
+#!markdown
+
+### Authenticate to the az cli
+
+#!pwsh
+
+az login --tenant <your-tenant-id>
+
+#!markdown
+
+### Set up local variables
+
+#!pwsh
+
+$resourceGroup = "techbash2025-rg"
+$storageAccountName = "tb2025storage"
+
+# NOTE: the function app name must be globally unique! (because it's part of the URL)
+$functionAppName = "techbash2025-<your initials or something unique here>-function"
+
+#!markdown
+
+### Create the Resource Group
+
+#!pwsh
+
+az group create --name $resourceGroup --location eastus
+
+#!markdown
+
+### Create the DEV Storage Account
+
+#!pwsh
+
+$name = $storageAccountName+"dev"
+az storage account create --name $name --location eastus `
+  --resource-group $resourceGroup --sku Standard_LRS
+
+#!markdown
+
+### Create the DEV Function App
+
+#!pwsh
+
+$name = $storageAccountName+"dev"
+az functionapp create --resource-group $resourceGroup `
+  --name "$functionAppName-dev" --flexconsumption-location eastus `
+  --runtime dotnet-isolated --runtime-version 9 `
+  --storage-account $name
+
+#!markdown
+
+### Create the PRD Storage Account
+
+#!pwsh
+
+$name = $storageAccountName+"prd"
+az storage account create --name $name --location eastus `
+  --resource-group $resourceGroup --sku Standard_LRS
+
+#!markdown
+
+### Create the PRD Function App
+
+#!pwsh
+
+$name = $storageAccountName+"prd"
+az functionapp create --resource-group $resourceGroup `
+  --name "$functionAppName-prd" --flexconsumption-location eastus `
+  --runtime dotnet-isolated --runtime-version 9 `
+  --storage-account $name

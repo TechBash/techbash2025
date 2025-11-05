@@ -1,0 +1,133 @@
+parameters:
+# parameters for branch protection
+- name: deployToDev
+  type: boolean
+  default: false
+- name: deployToPrd
+  type: boolean
+  default: false
+
+# parameters for Build stage
+- name: projectFile
+  type: string
+  default:
+
+# parameters for Deployment stages
+- name: adoEnvironment
+  type: object
+  default:
+    dev: dev
+    prd: prod
+- name: resourceGroup
+  type: string
+  default:
+
+# common parameters
+- name: deploymentName
+  type: string
+  default: 'project name not set'
+- name: linux
+  type: boolean
+  default: false
+- name: dotnetTargetVersion
+  type: string
+  default: 9
+- name: debugMode
+  type: boolean
+  default: false
+
+variables:
+- name: prdOnly
+  value: $[and(eq(${{ parameters.deployToPrd }}, True), eq(${{ parameters.deployToDev }}, False))]
+
+stages:
+
+- ${{ if parameters.debugMode }}:
+  - stage: Debug
+    displayName: Debug Info
+    jobs:
+    - job: DebugParameters
+      displayName: Parameters
+      steps:
+      # parameters for branch protection
+      - script: echo deployToDev = ${{ parameters.deployToDev }}
+        displayName: deployToDev
+      - script: echo deployToPrd = ${{ parameters.deployToPrd }}
+        displayName: deployToPrd
+
+      # common parameters
+      - script: echo deploymentName = ${{ parameters.deploymentName }}
+        displayName: deploymentName
+      - script: echo projectType = ${{ parameters.projectType }}
+        displayName: projectType
+      - script: echo linux = ${{ parameters.linux }}
+        displayName: linux
+      - script: echo dotnetTargetVersion = ${{ parameters.dotnetTargetVersion }}
+        displayName: dotnetTargetVersion
+
+      # parameters for Build stage
+      - script: echo "projectFile = ${{ parameters.projectFile }}"
+        displayName: projectFile
+      - script: echo nugetConfigFile = ${{ parameters.nugetConfigFile }}
+        displayName: nugetConfigFile
+      - script: echo isWebApp = ${{ parameters.isWebApp }}
+        displayName: isWebApp
+      - script: echo configuration = ${{ parameters.configuration }}
+        displayName: configuration
+      - script: echo unitTestsProjectFile = ${{ parameters.unitTestsProjectFile }}
+        displayName: unitTestsProjectFile
+
+      # parameters for Deployment stages
+      - script: echo configurationScript = ${{ parameters.configurationScript }}
+        displayName: configurationScript
+      - script: echo daysToRetain = ${{ parameters.daysToRetain }}
+        displayName: daysToRetain
+      - ${{ each pair in parameters.adoEnvironment }}:
+        - script: echo adoEnvironment ${{ pair.Key }} = ${{ pair.Value }}
+          displayName: adoEnvironment (${{ pair.Key }})
+
+  - job: DebugVariables
+    displayName: Variables
+    steps:
+    - script: echo prdOnly = $(prdOnly)
+      displayName: prdOnly
+
+- stage: build
+  displayName: Build ${{ parameters.deploymentName }}
+  jobs:
+  - template: job-build.yml
+    parameters:
+      projectFile: ${{ parameters.projectFile }}
+
+- ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+  
+  - ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(parameters.deployToDev, 'true')) }}:
+    - stage: dev
+      displayName: Deploy to DEV
+      dependsOn: build
+      condition: succeeded()
+      jobs:
+      - template: job-deploy.yml
+        parameters:
+          azureSubscription: ADO-workshop
+          environmentName: ${{ parameters.adoEnvironment.dev }}
+          deploymentName: Dev
+          functionName:  ${{ parameters.deploymentName }}-dev
+          resourceGroup: ${{ parameters.resourceGroup }}
+
+  - ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(parameters.deployToPrd, 'true')) }}:
+    - stage: prd
+      displayName: Deploy to PROD
+      ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(parameters.deployToDev, 'true')) }}:
+        dependsOn: dev
+      ${{ else }}:
+        dependsOn: build
+      condition: or(eq(variables.prdOnly, 'True'), succeeded())
+      jobs:
+      - template: job-deploy.yml
+        parameters:
+          azureSubscription: ADO-workshop
+          environmentName: ${{ parameters.adoEnvironment.prd }}
+          deploymentName: Prd
+          functionName:  ${{ parameters.deploymentName }}-prd
+          resourceGroup: ${{ parameters.resourceGroup }}

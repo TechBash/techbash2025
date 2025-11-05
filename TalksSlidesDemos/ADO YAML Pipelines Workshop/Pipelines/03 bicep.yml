@@ -1,0 +1,35 @@
+name: Release-$(rev:r)
+
+trigger: none
+
+stages:
+- stage: build
+  displayName: Build Function App
+  jobs:
+  - template: job-build.yml
+    parameters:
+      projectFile: $(Build.SourcesDirectory)/Demo Function/Demo_Function.csproj
+
+- stage: dev
+  dependsOn: build
+  displayName: Deploy to Dev environment
+  jobs:
+  - template: job-deploy-bicep.yml
+    parameters:
+      deploymentName: Dev
+      environmentName: Dev-CD
+      functionName: techbash2025-mfb-function-dev-bicep
+      resourceGroup: techbash2025-rg-bicep
+      azureSubscription: ADO-workshop
+
+- stage: prod
+  dependsOn: dev
+  displayName: Deploy to Prod environment
+  jobs:
+  - template: job-deploy-bicep.yml
+    parameters:
+      deploymentName: Prd
+      environmentName: Prod
+      functionName: techbash2025-mfb-function-prd-bicep
+      resourceGroup: techbash2025-rg-bicep
+      azureSubscription: ADO-workshop

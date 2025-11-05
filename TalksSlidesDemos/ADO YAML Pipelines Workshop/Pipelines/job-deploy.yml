@@ -1,0 +1,44 @@
+parameters:
+  deploymentName: ''
+  environmentName: ''
+  functionName: ''
+  resourceGroup: ''
+  azureSubscription: ''
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  pool:
+    vmImage: windows-latest
+  displayName: Deploy to ${{ parameters.environmentName }} environment
+  environment: ${{ parameters.environmentName }}
+  variables:
+    functionName: ${{ parameters.functionName }}
+    resourceGroup: ${{ parameters.resourceGroup }}
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: Checkout function source
+          path: source
+
+        - task: DownloadBuildArtifacts@1
+          displayName: Download build artifact
+          inputs:
+            buildType: current
+            downloadType: single
+            artifactName: drop
+            downloadPath: $(System.ArtifactsDirectory)
+
+        - task: AzureCLI@2
+          displayName: Deploy Flex Consumption Function '$(functionName)'
+          inputs:
+            azureSubscription: ${{ parameters.azureSubscription }}
+            scriptType: pscore
+            scriptLocation: inlineScript
+            failOnStandardError: false
+            inlineScript: |
+              # https://learn.microsoft.com/en-us/azure/azure-functions/deployment-zip-push#cli
+              $zipFile = Get-ChildItem -Path "$(System.ArtifactsDirectory)" -Filter *.zip -Recurse | Select-Object -First 1
+              Write-Output "Deploying zip file: '$($zipFile.FullName)'"
+              az functionapp deployment source config-zip -g $(resourceGroup) -n $(functionName) --src $($zipFile.FullName)
