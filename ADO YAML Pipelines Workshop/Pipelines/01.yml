@@ -1,0 +1,125 @@
+name: Release-$(rev:r)
+
+trigger: none
+
+stages:
+- stage: build
+  displayName: Build Function App
+  jobs:
+  - job: 
+    steps:
+    - checkout: self
+      displayName: Checkout source code
+
+    - task: UseDotNet@2
+      displayName: Use .NET Core sdk 9.0.x
+      inputs:
+        version: 9.0.x
+    
+    - task: NuGetAuthenticate@1
+      displayName: NuGet Authenticate
+    
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        projects: $(Build.SourcesDirectory)/Demo Function/Demo_Function.csproj
+        arguments: -c Release --output publish_output
+    
+    - task: ArchiveFiles@2
+      displayName: Archive publish_output folder
+      inputs:
+        rootFolderOrFile: 'publish_output/'
+        includeRootFolder: false
+        archiveType: zip
+        archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+        replaceExistingArchive: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Artifact
+      inputs:
+        PathtoPublish: $(build.artifactstagingdirectory)
+      condition: succeededOrFailed()
+
+- stage: dev
+  displayName: Deploy to Dev environment
+  jobs:
+  - deployment: dev
+    pool:
+      vmImage: windows-latest
+    displayName: Deploy to Dev environment
+    environment: Dev-CD
+    variables:
+      functionName: techbash2025-mfb-function-dev
+      resourceGroup: techbash2025-rg
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            displayName: Checkout function source
+            path: source
+
+          #- template: steps-dump agent file system.yml
+          
+          - task: DownloadBuildArtifacts@1
+            displayName: Download build artifact
+            inputs:
+              buildType: current
+              downloadType: single
+              artifactName: drop
+              downloadPath: $(System.ArtifactsDirectory)
+
+          - task: AzureCLI@2
+            displayName: Deploy Flex Consumption Function '$(functionName)'
+            inputs:
+              azureSubscription: ADO-workshop
+              scriptType: pscore
+              scriptLocation: inlineScript
+              failOnStandardError: false
+              inlineScript: |
+                # https://learn.microsoft.com/en-us/azure/azure-functions/deployment-zip-push#cli
+                $zipFile = Get-ChildItem -Path "$(System.ArtifactsDirectory)" -Filter *.zip -Recurse | Select-Object -First 1
+                Write-Output "Deploying zip file: '$($zipFile.FullName)'"
+                az functionapp deployment source config-zip -g $(resourceGroup) -n $(functionName) --src $($zipFile.FullName)
+  
+- stage: prod
+  dependsOn: dev
+  displayName: Deploy to Prod environment
+  jobs:
+  - deployment: prod
+    pool:
+      vmImage: windows-latest
+    displayName: Deploy to Prod environment
+    environment: Prod
+    variables:
+      functionName: techbash2025-mfb-function-prd
+      resourceGroup: techbash2025-rg
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            displayName: Checkout function source
+            path: source
+          
+          - task: DownloadBuildArtifacts@1
+            displayName: Download build artifact
+            inputs:
+              buildType: current
+              downloadType: single
+              artifactName: drop
+              downloadPath: $(System.ArtifactsDirectory)
+          
+          - task: AzureCLI@2
+            displayName: Deploy Flex Consumption Function '$(functionName)'
+            inputs:
+              azureSubscription: ADO-workshop
+              scriptType: pscore
+              scriptLocation: inlineScript
+              failOnStandardError: false
+              inlineScript: |
+                # https://learn.microsoft.com/en-us/azure/azure-functions/deployment-zip-push#cli
+                $zipFile = Get-ChildItem -Path "$(System.ArtifactsDirectory)" -Filter *.zip -Recurse | Select-Object -First 1
+                Write-Output "Deploying zip file: '$($zipFile.FullName)'"
+                az functionapp deployment source config-zip -g $(resourceGroup) -n $(functionName) --src $($zipFile.FullName)
+  

@@ -1,0 +1,92 @@
+name: Release-$(rev:r)
+
+trigger: none
+
+stages:
+- stage: build
+  displayName: Build Function App
+  jobs:
+  - template: job-build.yml
+    parameters:
+      projectFile: $(Build.SourcesDirectory)/Demo Function/Demo_Function.csproj
+
+- stage: dev
+  displayName: Deploy to Dev environment
+  jobs:
+  - deployment: dev
+    pool:
+      vmImage: windows-latest
+    displayName: Deploy to Dev environment
+    environment: Dev-CD
+    variables:
+      functionName: techbash2025-mfb-function-dev
+      resourceGroup: techbash2025-rg
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            displayName: Checkout function source
+            path: source
+
+          - task: DownloadBuildArtifacts@1
+            displayName: Download build artifact
+            inputs:
+              buildType: current
+              downloadType: single
+              artifactName: drop
+              downloadPath: $(System.ArtifactsDirectory)
+
+          - task: AzureCLI@2
+            displayName: Deploy Flex Consumption Function '$(functionName)'
+            inputs:
+              azureSubscription: ADO-workshop
+              scriptType: pscore
+              scriptLocation: inlineScript
+              failOnStandardError: false
+              inlineScript: |
+                # https://learn.microsoft.com/en-us/azure/azure-functions/deployment-zip-push#cli
+                $zipFile = Get-ChildItem -Path "$(System.ArtifactsDirectory)" -Filter *.zip -Recurse | Select-Object -First 1
+                Write-Output "Deploying zip file: '$($zipFile.FullName)'"
+                az functionapp deployment source config-zip -g $(resourceGroup) -n $(functionName) --src $($zipFile.FullName)
+  
+- stage: prod
+  dependsOn: dev
+  displayName: Deploy to Prod environment
+  jobs:
+  - deployment: prod
+    pool:
+      vmImage: windows-latest
+    displayName: Deploy to Prod environment
+    environment: Prod
+    variables:
+      functionName: techbash2025-mfb-function-prd
+      resourceGroup: techbash2025-rg
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            displayName: Checkout function source
+            path: source
+
+          - task: DownloadBuildArtifacts@1
+            displayName: Download build artifact
+            inputs:
+              buildType: current
+              downloadType: single
+              artifactName: drop
+              downloadPath: $(System.ArtifactsDirectory)
+
+          - task: AzureCLI@2
+            displayName: Deploy Flex Consumption Function '$(functionName)'
+            inputs:
+              azureSubscription: ADO-workshop
+              scriptType: pscore
+              scriptLocation: inlineScript
+              failOnStandardError: false
+              inlineScript: |
+                # https://learn.microsoft.com/en-us/azure/azure-functions/deployment-zip-push#cli
+                $zipFile = Get-ChildItem -Path "$(System.ArtifactsDirectory)" -Filter *.zip -Recurse | Select-Object -First 1
+                Write-Output "Deploying zip file: '$($zipFile.FullName)'"
+                az functionapp deployment source config-zip -g $(resourceGroup) -n $(functionName) --src $($zipFile.FullName)

@@ -1,0 +1,56 @@
+name: Release-$(rev:r)
+
+trigger: none
+
+parameters:
+  - name: framework
+    displayName: .NET Framework Version
+    type: string
+    default: 9
+    values:
+      - 8
+      - 9
+      - 10
+  - name: linux
+    displayName: Build & deploy as Linux?
+    type: boolean
+    default: true
+
+  - name: deployToDev
+    displayName: Deploy to DEV Subscription
+    type: boolean
+    default: true
+  - name: deployToPrd
+    displayName: Deploy to PRD Subscription
+    type: boolean
+    default: true
+  - name: applicationName
+    type: string
+    default: techbash2025-mfb-function
+    values:
+      - techbash2025-mfb-function
+
+extends:
+  template: master template.yml
+  parameters:
+    deployToDev: ${{ parameters.deployToDev }}
+    deployToPrd: ${{ parameters.deployToPrd }}
+    
+    deploymentName: ${{ parameters.applicationName }}
+    dotnetTargetVersion: ${{ parameters.framework }}
+    linux: ${{ parameters.linux }}
+    resourceGroup: techbash2025-rg
+    
+    projectFile: $(Build.SourcesDirectory)/Demo Function/Demo_Function.csproj
+
+# extends:
+#   template: master template.yml
+#   parameters:
+#     deployToDev: true
+#     deployToPrd: true
+    
+#     deploymentName: techbash2025-mfb-function
+#     dotnetTargetVersion: 9
+#     linux: true
+#     resourceGroup: techbash2025-rg
+#     projectFile: $(Build.SourcesDirectory)/Demo Function/Demo_Function.csproj

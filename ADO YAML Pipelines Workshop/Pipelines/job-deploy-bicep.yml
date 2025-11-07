@@ -1,0 +1,64 @@
+parameters:
+  deploymentName: ''
+  environmentName: ''
+  functionName: ''
+  resourceGroup: ''
+  azureSubscription: ''
+  location: 'EastUS2'
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  pool:
+    vmImage: windows-latest
+  displayName: Deploy to ${{ parameters.environmentName }} environment
+  environment: ${{ parameters.environmentName }}
+  variables:
+    functionName: ${{ parameters.functionName }}
+    resourceGroup: ${{ parameters.resourceGroup }}
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: Checkout source
+          path: source
+
+        - task: AzureCLI@2
+          displayName: Ensure Function App exists via Bicep
+          inputs:
+            azureSubscription: ${{ parameters.azureSubscription }}
+            scriptType: pscore
+            scriptLocation: inlineScript
+            inlineScript: |
+              az group create --name ${{ parameters.resourceGroup }} --location ${{ parameters.location }}
+
+              az deployment group create `
+                --resource-group ${{ parameters.resourceGroup }} `
+                --template-file $(Build.SourcesDirectory)/Pipelines/functionapp.bicep `
+                --parameters `
+                  functionAppName=${{ parameters.functionName }} `
+                  location=${{ parameters.location }} `
+                  environmentName=${{ parameters.environmentName }}
+
+        - task: DownloadBuildArtifacts@1
+          displayName: Download build artifact
+          inputs:
+            buildType: current
+            downloadType: single
+            artifactName: drop
+            downloadPath: $(System.ArtifactsDirectory)
+
+        - task: AzureCLI@2
+          displayName: Deploy Function App code
+          inputs:
+            azureSubscription: ${{ parameters.azureSubscription }}
+            scriptType: pscore
+            scriptLocation: inlineScript
+            failOnStandardError: false
+            inlineScript: |
+              $zipFile = Get-ChildItem -Path "$(System.ArtifactsDirectory)" -Filter *.zip -Recurse | Select-Object -First 1
+              Write-Output "Deploying zip file: '$($zipFile.FullName)'"
+              az functionapp deployment source config-zip `
+                --resource-group ${{ parameters.resourceGroup }} `
+                --name ${{ parameters.functionName }} `
+                --src $($zipFile.FullName)
