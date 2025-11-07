@@ -1,0 +1,1 @@
+Thanks for joining me for this presentation. The slides and code samples are available on GitHub at: [https://github.com/mikerapa/Python-for-.Net-Developers](https://github.com/mikerapa/Python-for-.Net-Developers)
