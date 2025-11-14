@@ -10,5 +10,11 @@ https://github.com/tyraziel/home-labbing-on-a-time-budget
 
 ## How to View Slides (reveal.js)
 
+Via your browser right now:
+
+1. Go to [https://tyraziel.github.io/home-labbing-on-a-time-budget/techbash2025.html](https://tyraziel.github.io/home-labbing-on-a-time-budget/techbash2025.html)
+
+Or, you can view them locally via:
+
 1. Clone the https://github.com/tyraziel/home-labbing-on-a-time-budget repository.  
 2. Open the `techbash2025.html` file in your browser.
